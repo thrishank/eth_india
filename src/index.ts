@@ -4,7 +4,7 @@ import { getUserState, resetUserState, saveTokens, updateUserState } from "./lib
 import { APIResponse } from "./types/type";
 import { Prisma, PrismaClient } from "@prisma/client";
 import { do_transfer, transfer } from "./commands/transfer";
-import { request } from "undici";
+import { fetch, request } from "undici";
 
 import { get_wallet } from "./lib/wallet";
 import { do_swap } from "./commands/swap";
@@ -13,6 +13,8 @@ import { fetchNameSuggestions } from "./lib/base";
 import { wallet } from "./commands/wallet";
 import { portfolio } from "./commands/portfolio";
 import { history } from "./commands/history";
+import path from "path";
+import * as fs from "fs";
 
 const bot_token = "7887692704:AAE9g8oEGMB-REyHu7ZITvzrVLOG10f11Mc"
 const bot = new Telegraf(bot_token);
@@ -30,6 +32,64 @@ const menu_bar_commands = [
     { command: "cancel", description: "Cancel the current process" },
     { command: "logout", description: "Logout of the bot" },
 ];
+ 
+const filePath = path.join(__dirname, 'chat_data.json');
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+
+if (!fs.existsSync(filePath)) {
+    fs.writeFileSync(filePath, '[]');
+}
+
+function getFileSize(file: string): number {
+    return fs.statSync(file).size;
+}
+
+async function onFileSizeExceeded(file: string) {
+    console.log(`File size exceeded 5MB: ${file}`);
+    const WALRUS_PUBLISHER = 'https://publisher.walrus-testnet.walrus.space'; 
+    try {
+        const fileStream = fs.createReadStream(file);
+        const response = await fetch(`${WALRUS_PUBLISHER}/v1/store?epochs=5`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/octet-stream',
+            },
+            body: fileStream,
+            duplex: 'half',
+        });
+    
+        if (!response.ok) {
+            const errorBody = await response.text();
+            throw new Error(`HTTP error! status: ${response.status}, body: ${errorBody}`);
+        }
+    
+        const responseData = await response.json();
+        console.log('File uploaded to Walrus:', responseData);
+        fs.writeFileSync(file, '[]');
+    } catch (error) {
+        console.error('Error uploading file to Walrus:', error);
+    }
+}
+
+function appendToFile(data: any) {
+    const existingData = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    existingData.push(data);
+    fs.writeFileSync(filePath, JSON.stringify(existingData, null, 2));
+
+    if (getFileSize(filePath) > MAX_FILE_SIZE) {
+        console.log(getFileSize(filePath));
+        onFileSizeExceeded(filePath);
+    }
+}
+
+bot.use(async (ctx, next) => {
+    const interaction = {
+        update: ctx.update,  
+        timestamp: new Date().toISOString(),
+    };
+    await next();  
+    appendToFile(interaction);
+});
 
 bot.use((ctx, next) => {
     console.log(ctx.message);
