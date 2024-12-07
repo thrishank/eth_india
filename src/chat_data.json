@@ -1,0 +1,33 @@
+[
+  {
+    "update": {
+      "update_id": 316291923,
+      "message": {
+        "message_id": 1,
+        "from": {
+          "id": 1520778961,
+          "is_bot": false,
+          "first_name": "Eagle",
+          "username": "thris3",
+          "language_code": "en"
+        },
+        "chat": {
+          "id": 1520778961,
+          "first_name": "Eagle",
+          "username": "thris3",
+          "type": "private"
+        },
+        "date": 1733611998,
+        "text": "/start",
+        "entities": [
+          {
+            "offset": 0,
+            "length": 6,
+            "type": "bot_command"
+          }
+        ]
+      }
+    },
+    "timestamp": "2024-12-07T22:53:19.221Z"
+  }
+]
