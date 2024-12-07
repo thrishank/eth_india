@@ -15,7 +15,7 @@ export async function login(ctx: Context) {
   }
 
   const userAuth = await prisma.userAuth.findUnique({ where: { userId } });
-  if(userAuth?.walletCreated === false){
+  if (userAuth?.walletCreated === false) {
     await create_wallet(userAuth.authToken);
     await prisma.userAuth.update({
       where: { userId },
@@ -93,7 +93,10 @@ export async function create_wallet(token: string) {
   const res = await request('https://sandbox-api.okto.tech/api/v1/wallet', {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${token}`
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      "User-Agent": "NextJSDev/1.0",
+      Referer: "http://localhost:3000",
     }
   })
   return res;
@@ -104,7 +107,10 @@ export async function getWallet(token: string) {
   const res = await request('https://sandbox-api.okto.tech/api/v1/wallet', {
     method: 'GET',
     headers: {
-      Authorization: `Bearer ${token}`
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      "User-Agent": "NextJSDev/1.0",
+      Referer: "http://localhost:3000",
     }
   })
   return res;

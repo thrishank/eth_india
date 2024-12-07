@@ -3,7 +3,7 @@ import { login, login_okto, verify_login_otp } from "./commands/login";
 import { getUserState, resetUserState, saveTokens, updateUserState } from "./lib/prisma";
 import { APIResponse } from "./types/type";
 import { Prisma, PrismaClient } from "@prisma/client";
-import { do_transfer, transfer } from "./commands/transfer";
+import { do_transfer, pollOrderStatus, transfer } from "./commands/transfer";
 import { request } from "undici";
 
 import { get_wallet } from "./lib/wallet";
@@ -20,32 +20,32 @@ const bot = new Telegraf(bot_token);
 const prisma = new PrismaClient();
 
 const menu_bar_commands = [
-  {
-    command: "start",
-    description:
-      "🚀 Kickstart your journey with the bot and explore its features!",
-  },
-  { command: "login", description: "🔑 Log in securely using your email" },
-  {
-    command: "wallet",
-    description: "💼 View your wallet addresses for different networks",
-  },
-  { command: "portfolio", description: "Get your portfolio details" },
-  {
-    command: "transfer",
-    description: "Transfer tokens to any wallet quickly and securely",
-  },
-  { command: "swap", description: "Swap tokens" },
-  {
-    command: "history",
-    description:
-      "📜 View a detailed log of your past transactions and activities",
-  },
-  {
-    command: "cancel",
-    description: "❌ Stop the current operation and reset to a neutral state.",
-  },
-  { command: "logout", description: "🚪 Log out of your session" },
+    {
+        command: "start",
+        description:
+            "🚀 Kickstart your journey with the bot and explore its features!",
+    },
+    { command: "login", description: "🔑 Log in securely using your email" },
+    {
+        command: "wallet",
+        description: "💼 View your wallet addresses for different networks",
+    },
+    { command: "portfolio", description: "Get your portfolio details" },
+    {
+        command: "transfer",
+        description: "Transfer tokens to any wallet quickly and securely",
+    },
+    { command: "swap", description: "Swap tokens" },
+    {
+        command: "history",
+        description:
+            "📜 View a detailed log of your past transactions and activities",
+    },
+    {
+        command: "cancel",
+        description: "❌ Stop the current operation and reset to a neutral state.",
+    },
+    { command: "logout", description: "🚪 Log out of your session" },
 ];
 
 bot.use((ctx, next) => {
@@ -57,7 +57,7 @@ bot.telegram.setMyCommands(menu_bar_commands);
 
 bot.start((ctx) => {
     return ctx.reply(
-      "Hey there! I’m your crypto buddy. How can I make your day easier today?"
+        "Hey there! I’m your crypto buddy. How can I make your day easier today?"
     );
 })
 
@@ -155,7 +155,7 @@ bot.command("cancel", async (ctx) => {
     });
 
     return ctx.reply(
-      "✅ Your previous interaction has been successfully cancelled. You can now start fresh! 🚀"
+        "✅ Your previous interaction has been successfully cancelled. You can now start fresh! 🚀"
     );
 
 });
@@ -252,7 +252,7 @@ bot.on("text", async (ctx) => {
                 });
 
                 const confirmationMessage =
-                    `You are about to transfer ${parseFloat(data.amount!)} ${data.token!.toUpperCase()} to ${data.address}.\n\nConfirm? (yes/no)`;
+                    `You are about to transfer ${parseFloat(data.amount!)} ${data.token!.toUpperCase()} to ${data.address} on ${data.network} network.\n\nConfirm? (yes/no)`;
 
                 return ctx.reply(confirmationMessage);
             } else {
@@ -269,11 +269,11 @@ bot.on("text", async (ctx) => {
             await login(ctx);
         }
         else if (ai_res.command === "logout") {
-          await logout(ctx);
+            await logout(ctx);
         } else {
-          return ctx.reply(
-            "🤔 Oops! I couldn't quite understand that. Could you try again or check the available commands? 😊"
-          );
+            return ctx.reply(
+                "🤔 Oops! I couldn't quite understand that. Could you try again or check the available commands? 😊"
+            );
         }
     }
 
@@ -499,8 +499,19 @@ bot.on("text", async (ctx) => {
                 if (res.statusCode === 200) {
                     const data = await res.body.json();
                     console.log(data);
+
+                    ctx.reply("Transfer in progress...");
+                    // @ts-ignore
+                    const finalStatus = await pollOrderStatus(data.data.orderId, userAuth.authToken);
                     await resetUserState(userId);
-                    return ctx.reply("Transfer successful!");
+                    if(finalStatus === "SUCCESS"){
+                        return ctx.reply("Transfer successful!");
+                    } else if(finalStatus === "FAILED"){
+                        return ctx.reply("Transfer failed");
+                    } else{
+                        return ctx.reply("Transfer still in progress...");
+                    }
+             
                 } else {
                     await resetUserState(userId);
                     return ctx.reply("Transfer failed. Please try again /transfer");
