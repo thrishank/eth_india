@@ -2,9 +2,14 @@ import { Telegraf } from "telegraf";
 import { login, login_okto, verify_login_otp } from "./commands/login";
 import { getUserState, resetUserState, saveTokens, updateUserState } from "./prisma";
 import { APIResponse } from "./types/type";
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 import { do_transfer, transfer } from "./commands/transfer";
 import { request } from "undici";
+ 
+import { get_wallet } from "./lib/wallet";
+import { do_swap } from "./commands/swap";
+import { processUserInput } from "./lib/ai";
+
 
 const bot_token = "7887692704:AAE9g8oEGMB-REyHu7ZITvzrVLOG10f11Mc"
 const bot = new Telegraf(bot_token);
@@ -43,10 +48,10 @@ bot.command("wallet", async (ctx) => {
         }
     })
 
-    const data = await res.body.json();
+    const response_data = await res.body.json();
 
     // @ts-ignore
-    const base_wallet = data.data.wallets.find((wallet: any) => wallet.network_name === "BASE");
+    const base_wallet = response_data.data.wallets.find((wallet: any) => wallet.network_name === "BASE");
 
     ctx.reply(`Your BASE wallet address is:\n<code>${base_wallet.address}</code>`, {
         parse_mode: 'HTML'
@@ -110,38 +115,59 @@ bot.command("transfer", (ctx) => {
     transfer(ctx);
 })
 
+bot.command("swap", async (ctx) => {
+    const userId = ctx.from!.id.toString();
+
+  const { stage, context } = await getUserState(userId);
+
+  if (stage !== "neutral") {
+    return ctx.reply(
+      "You are already in the middle of another process. Use /cancel to reset the current flow."
+    );
+  }
+
+  await updateUserState(userId, {
+    stage: "from_token",
+    context: { isAI: false, command: "swap", sub_command: "from_token" },
+  });
+
+  return ctx.reply("Which token would you like to swap (e.g., USDC, ETH)?");
+})
+
+bot.command("history", async (ctx) => {
+
+})
 bot.command("cancel", async (ctx) => {
     const userId = ctx.from.id.toString();
 
-    await resetUserState(userId);
-    const existingData = await prisma.token.findMany({
-        where: {
-            userId
-        }
-    })
-    for (const data of existingData) {
-        await prisma.token.delete({
-            where: {
-                id: data.id
+    try {
+        // Update the user state to reset it
+        await prisma.userState.update({
+            where: { userId },
+            data: {
+                stage: 'initial', // or whatever initial stage you want
+                context: '' // reset context
             }
-        })
-    }
-    const existingProcess = await prisma.current_process.findMany({
-        where: {
-            userId
+        });
+    } catch (error) {
+        // If the user state doesn't exist, we can safely ignore this error
+        if (!(error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025')) {
+            throw error;
         }
-    })
-    for (const data of existingProcess) {
-        await prisma.current_process.delete({
-            where: {
-                id: data.id
-            }
-        })
     }
+
+    // Delete all tokens for this user
+    await prisma.token.deleteMany({
+        where: { userId }
+    });
+
+    // Delete all current processes for this user
+    await prisma.current_process.deleteMany({
+        where: { userId }
+    });
 
     return ctx.reply("Flow canceled. Use /login to start again.");
 });
-
 bot.command("logout", async (ctx) => {
     const userId = ctx.from.id.toString();
     await resetUserState(userId);
@@ -194,16 +220,35 @@ bot.on("text", async (ctx) => {
     }
 
     if (context.isAI) {
-        // Process message with AI
-        const user_prompt = ctx.message.text;
+        const user_prompt = ctx.message.text.trim();
+        const userId = ctx.from.id.toString();
+        const ai_res = await processUserInput(user_prompt);
+        if(ai_res.command === "transfer"){
+            const data = ai_res.data;
+            // ammount, address, token if all is there 
+            await updateUserState(userId, {
+                stage: "confirmation",
+                context: { ...context, sub_command: "confirmation" },
+            });
 
-        // return ctx.reply("Processing with AI...");
-        // const ai_res = call_ai(user_prompt);
-        //ctx.reply(ai_res);
-        ctx.reply("Hello from AI");
+            await prisma.current_process.create({
+                data: {
+                    userId: userId,
+                    data: JSON.stringify({
+                        token: data?.token,
+                        address: data?.address,
+                        amount: data?.amount
+                    })
+                }
+            })
+            // why is this confiliting with the cancel order
+            await ctx.reply("/transfer");
+        } else{
+            ctx.reply("/"+ai_res.command);
+        }
     }
 
-    const user_name = ctx.from.username;
+     
     if (context.command === "login") {
         if (stage === "email") {
             const email = ctx.message.text;
@@ -216,7 +261,7 @@ bot.on("text", async (ctx) => {
             if (res.status === "success") {
                 await prisma.token.create({
                     data: {
-                        userId: user_name!,
+                        userId: userId!,
                         token: res.data.token,
                         email: email
                     }
@@ -236,7 +281,7 @@ bot.on("text", async (ctx) => {
             console.log(otp);
             const otp_data = await prisma.token.findFirst({
                 where: {
-                    userId: user_name!
+                    userId: userId!
                 }
             })
 
@@ -263,6 +308,7 @@ bot.on("text", async (ctx) => {
     }
 
     if (context.command === "transfer") {
+
         switch (stage) {
             case "token_name": {
                 const tokenName = ctx.message.text.toUpperCase();
@@ -282,7 +328,7 @@ bot.on("text", async (ctx) => {
 
                 await updateUserState(userId, {
                     stage: "receiver_address",
-                    context: { ...context, sub_command: "receiver_address", }
+                    context: { sub_command: "receiver_address",  command: "transfer", isAI: false }
                 });
 
                 return ctx.reply("Please enter the receiver's wallet address:");
@@ -401,6 +447,188 @@ bot.on("text", async (ctx) => {
             }
         }
     }
+
+    if (context.command === "swap") {
+        switch (stage) {
+            case "from_token": {
+                const fromToken = ctx.message.text.toUpperCase();
+    
+                if (!["USDC", "ETH", "DAI"].includes(fromToken)) {
+                    return ctx.reply("Invalid token. Please enter a valid token name (e.g., USDC, ETH, DAI):");
+                }
+    
+                await prisma.current_process.create({
+                    data: {
+                        userId: userId,
+                        data: JSON.stringify({
+                            fromToken
+                        })
+                    }
+                });
+    
+                await updateUserState(userId, {
+                    stage: "to_token",
+                    context: { ...context, sub_command: "to_token" },
+                });
+    
+                return ctx.reply("Enter the token you want to swap to (e.g., USDC, ETH, DAI):");
+            }
+            case "to_token": {
+                const toToken = ctx.message.text.toUpperCase();
+    
+                if (!["USDC", "ETH", "DAI"].includes(toToken)) {
+                    return ctx.reply("Invalid token. Please enter a valid token name (e.g., USDC, ETH, DAI):");
+                }
+    
+                const existingData = await prisma.current_process.findFirst({
+                    where: {
+                        userId: userId
+                    }
+                });
+    
+                await prisma.current_process.update({
+                    where: {
+                        id: existingData?.id!
+                    },
+                    data: {
+                        data: {
+                            set: JSON.stringify({
+                                ...JSON.parse(existingData?.data!),
+                                toToken
+                            })
+                        }
+                    }
+                });
+    
+                await updateUserState(userId, {
+                    stage: "amount",
+                    context: { ...context, sub_command: "amount" },
+                });
+    
+                return ctx.reply(`You want to swap to ${toToken}. Now enter the amount you want to swap:`);
+            }
+            case "amount": {
+                const amount = parseFloat(ctx.message.text);
+    
+                if (isNaN(amount) || amount <= 0) {
+                    return ctx.reply("Invalid amount. Please enter a valid number:");
+                }
+    
+                const existingData = await prisma.current_process.findFirst({
+                    where: {
+                        userId: userId
+                    }
+                });
+    
+                await prisma.current_process.update({
+                    where: {
+                        id: existingData?.id!
+                    },
+                    data: {
+                        data: {
+                            set: JSON.stringify({
+                                ...JSON.parse(existingData?.data!),
+                                amount
+                            })
+                        }
+                    }
+                });
+    
+                await updateUserState(userId, {
+                    stage: "confirmation",
+                    context: { ...context, sub_command: "confirmation" },
+                });
+    
+                const data = JSON.parse(existingData?.data!);
+                return ctx.reply(
+                    `You are swapping ${amount} ${data.fromToken} to ${data.toToken}.\n\nConfirm? (yes/no)`
+                );
+            }
+            case "confirmation": {
+                const confirmation = ctx.message.text.toLowerCase();
+    
+                if (confirmation !== "yes" && confirmation !== "no") {
+                    return ctx.reply('Please type "yes" to confirm or "no" to cancel.');
+                }
+    
+                if (confirmation === "no") {
+                    await resetUserState(userId);
+                    return ctx.reply("Swap canceled. Use /swap to start again.");
+                }
+    
+                const db_data = await prisma.current_process.findFirst({
+                    where: {
+                        userId: userId
+                    }
+                });
+    
+                const swapData = JSON.parse(db_data?.data!);
+                const userAuth = await prisma.userAuth.findUnique({ where: { userId } });
+    
+                if (!userAuth) {
+                    await resetUserState(userId);
+                    return ctx.reply("You are not logged in. Use /login to authenticate.");
+                }
+    
+                const { fromToken, toToken, amount } = swapData;
+                const wallet = await get_wallet(userAuth.authToken);
+
+                try {
+                    const params = new URLSearchParams({
+                        chainId: '8453',
+                        fromAddress: wallet,
+                        receiver: wallet,
+                        spender: wallet,
+                        amountIn: (amount * 1_000_000).toString(),
+                        slippage: '50',
+                        tokenIn: '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913',
+                        tokenOut: '0x4200000000000000000000000000000000000006',
+                        routingStrategy: 'router'
+                      });
+                  
+                      const res = await request(`https://api.enso.finance/api/v1/shortcuts/route?${params}`, {
+                        method: 'GET',
+                        headers: {
+                          'Authorization': 'Bearer 91c8982d-307c-4a5a-9aa6-d3c10adcea21',
+                          'Content-Type': 'application/json'
+                        }
+                      });
+                  
+                    const data = await res.body.json();
+    
+                    // @ts-ignore
+                    const okto_res = await do_swap(userAuth.authToken, wallet, data.tx.data, data.tx.value)
+                    await prisma.current_process.delete({
+                        where: {
+                            id: db_data?.id!
+                        }
+                    });
+            
+                    await resetUserState(userId);
+                    if(okto_res.statusCode === 400){
+                        ctx.reply("Swap failed. Please try again /swap");
+                    } else{
+                        ctx.reply("Swap successful!");
+                    }
+
+                    // return ctx.reply(
+                    //     `Transaction details:\n\n` +
+                    //     `From: ${from}\n` +
+                    //     `To: ${to}\n` +
+                    //     `Data: ${data}\n` +
+                    //     `Value: ${value}\n\n` +
+                    //     `You can now execute this transaction on-chain.`
+                    // );
+                } catch (error) {
+                    console.error(error);
+                    await resetUserState(userId);
+                    return ctx.reply("An error occurred during the swap process. Please try again later.");
+                }
+                
+            }
+        }
+    }
+    
 })
 
 

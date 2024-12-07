@@ -44,7 +44,7 @@ function db() {
         return __generator(this, function (_a) {
             switch (_a.label) {
                 case 0:
-                    _a.trys.push([0, 6, 7, 9]);
+                    _a.trys.push([0, 7, 8, 10]);
                     return [4 /*yield*/, prisma.userAuth.findMany()];
                 case 1:
                     x = _a.sent();
@@ -61,16 +61,19 @@ function db() {
                     return [4 /*yield*/, prisma.token.deleteMany()];
                 case 5:
                     _a.sent();
-                    return [3 /*break*/, 9];
+                    return [4 /*yield*/, prisma.current_process.deleteMany()];
                 case 6:
+                    _a.sent();
+                    return [3 /*break*/, 10];
+                case 7:
                     error_1 = _a.sent();
                     console.error("Error in database operation:", error_1);
-                    return [3 /*break*/, 9];
-                case 7: return [4 /*yield*/, prisma.$disconnect()];
-                case 8:
+                    return [3 /*break*/, 10];
+                case 8: return [4 /*yield*/, prisma.$disconnect()];
+                case 9:
                     _a.sent();
                     return [7 /*endfinally*/];
-                case 9: return [2 /*return*/];
+                case 10: return [2 /*return*/];
             }
         });
     });
@@ -97,4 +100,4 @@ function get_db() {
         });
     });
 }
-get_db();
+db();

@@ -11,6 +11,7 @@ async function db() {
         await prisma.userAuth.deleteMany();
         await prisma.userState.deleteMany();
         await prisma.token.deleteMany();
+        await prisma.current_process.deleteMany();
         
     } catch (error) {
         console.error("Error in database operation:", error);
@@ -30,4 +31,4 @@ async function get_db(){
     console.log("z data", z);
 }
 
-get_db();
+db();

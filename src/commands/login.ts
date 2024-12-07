@@ -16,13 +16,17 @@ export async function login(ctx: Context) {
   }
 
   const userAuth = await prisma.userAuth.findUnique({ where: { userId } });
+  if(userAuth?.walletCreated === false){
+    await create_wallet(userAuth.authToken);
+    await prisma.userAuth.update({
+      where: { userId },
+      data: {
+        walletCreated: true
+      }
+    })
+  }
+
   if (userAuth?.authToken) {
-
-    const wallet = await getWallet(userAuth.authToken);
-
-    if(wallet.statusCode !== 200){
-      await create_wallet(userAuth.authToken);
-    }
     return ctx.reply("Hello I am your AI assistant. How can I help you today? Your'e already logged in with OKTO");
   }
 
@@ -98,7 +102,7 @@ export async function create_wallet(token: string) {
 
 }
 
-export async function getWallet(token: string){
+export async function getWallet(token: string) {
   const res = await request('https://sandbox-api.okto.tech/api/v1/wallet', {
     method: 'GET',
     headers: {

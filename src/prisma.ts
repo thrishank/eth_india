@@ -12,9 +12,15 @@ export const getUserState = async (
 ): Promise<{ stage: string; context: UserContext }> => {
     let state = await prisma.userState.findUnique({ where: { userId } });
 
-    if (!state) {
-        state = await prisma.userState.create({
-            data: {
+    if (!state || !state.context) {
+        console.log('Upserting state:', state);
+        state = await prisma.userState.upsert({
+            where: { userId },
+            update: {
+                stage: "neutral",
+                context: JSON.stringify({ isAI: true }),
+            },
+            create: {
                 userId,
                 stage: "neutral",
                 context: JSON.stringify({ isAI: true }),
@@ -22,10 +28,23 @@ export const getUserState = async (
         });
     }
 
-    return {
-        stage: state.stage,
-        context: JSON.parse(state.context) as UserContext,
-    };
+    try {
+        const context = state.context 
+            ? JSON.parse(state.context) 
+            : { isAI: true };
+
+        return {
+            stage: state.stage,
+            context: context as UserContext,
+        };
+    } catch (error) {
+        console.error('Error parsing user state context:', error);
+        
+        return {
+            stage: state.stage,
+            context: { isAI: true } as UserContext,
+        };
+    }
 };
 
 export const updateUserState = async (

@@ -14,12 +14,13 @@ datasource db {
 }
 
 model UserAuth {
-  id           Int      @id @default(autoincrement())
-  userId       String   @unique // Telegram User ID
-  authToken    String
-  refreshToken String
-  deviceToken  String
-  updatedAt    DateTime @updatedAt
+  id            Int      @id @default(autoincrement())
+  userId        String   @unique // Telegram User ID
+  authToken     String
+  refreshToken  String
+  deviceToken   String
+  updatedAt     DateTime @updatedAt
+  walletCreated Boolean?  @default(false)
 }
 
 model UserState {
