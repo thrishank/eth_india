@@ -1,5 +1,5 @@
 import { Context } from "telegraf";
-import { getUserState, updateUserState } from "../prisma";
+import { getUserState, updateUserState } from "../lib/prisma";
 import { request } from "undici";
 import { PrismaClient } from "@prisma/client";
 
@@ -21,7 +21,7 @@ export async function transfer(ctx: Context) {
     context: { isAI: false, command: "transfer", sub_command: "token_name" },
   });
 
-  return ctx.reply("Which token would you like to transfer (e.g., USDC, ETH)?");
+  return ctx.reply("On which network do you want to transfer tokens? i.e.(BASE, POLYGON) etc.");
 }
 
 export async function do_transfer(

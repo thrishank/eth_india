@@ -7,6 +7,7 @@ const genAI = new GoogleGenerativeAI("AIzaSyA6FvmOifed0fo7Ch3qdc7sN34QEA3KE54");
 interface CommandResponse {
   command: string;
   data?: {
+    network?: string;
     address?: string;
     amount?: string;
     token?: string;
@@ -45,14 +46,11 @@ export async function processUserInput(userInput: string): Promise<CommandRespon
     {"command": "portfolio", "data": {}}
   - If the intent is "previous orders":
     Output:
-    {"command": "previous orders", "data": {}}
-  - If the intent is "previous n orders":
-    Output:
-    {"command": "previous n orders", "data": {"count":"n"}}
+    {"command": "history", "data": {}}
   - If the intent is "transfer":
-    Extract the address, amount, and token. Use empty strings for any missing fields.
+    Extract the address, amount, network and token. Use empty strings for any missing fields.
     Example Output:
-    {"command": "transfer", "data": {"address": "<address>", "amount": "<amount>", "token": "<token>"}}
+    {"command": "transfer", "data": {"address": "<address>", "amount": "<amount>", "token": "<token>", "network": "<network>"}}
   - If the intent is "swap":
     Extract to_token, from_token, and amount. Use empty strings for any missing fields.
     Example Output:

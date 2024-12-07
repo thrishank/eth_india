@@ -1,8 +1,7 @@
 import { Context } from "telegraf";
-import { getUserState, updateUserState } from "../prisma";
+import { getUserState, updateUserState } from "../lib/prisma";
 import { request } from "undici";
 import { prisma } from "../types/data";
-
 
 export async function login(ctx: Context) {
   const userId = ctx.from!.id.toString();
@@ -38,7 +37,6 @@ export async function login(ctx: Context) {
 
   return ctx.reply("Please enter your email address to begin login:");
 }
-
 
 const OKTO_API_KEY = "50142dbc-b4d4-4577-a4db-7580ac14256c";
 

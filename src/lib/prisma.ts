@@ -1,5 +1,5 @@
 import { PrismaClient } from "@prisma/client";
-import { TokenResponse, UserContext } from "./types/type";
+import { TokenResponse, UserContext } from "../types/type";
 
 const prisma = new PrismaClient();
 
