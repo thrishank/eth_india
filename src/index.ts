@@ -20,15 +20,32 @@ const bot = new Telegraf(bot_token);
 const prisma = new PrismaClient();
 
 const menu_bar_commands = [
-    { command: "start", description: "Start the bot" },
-    { command: "login", description: "Login using your email seamlessly" },
-    { command: "wallet", description: "Get your wallet addresses" },
-    { command: "portfolio", description: "Get your portfolio details" },
-    { command: "transfer", description: "Transfer tokens" },
-    { command: "swap", description: "Swap tokens" },
-    { command: "history", description: "Get your transaction history" },
-    { command: "cancel", description: "Cancel the current process" },
-    { command: "logout", description: "Logout of the bot" },
+  {
+    command: "start",
+    description:
+      "🚀 Kickstart your journey with the bot and explore its features!",
+  },
+  { command: "login", description: "🔑 Log in securely using your email" },
+  {
+    command: "wallet",
+    description: "💼 View your wallet addresses for different networks",
+  },
+  { command: "portfolio", description: "Get your portfolio details" },
+  {
+    command: "transfer",
+    description: "Transfer tokens to any wallet quickly and securely",
+  },
+  { command: "swap", description: "Swap tokens" },
+  {
+    command: "history",
+    description:
+      "📜 View a detailed log of your past transactions and activities",
+  },
+  {
+    command: "cancel",
+    description: "❌ Stop the current operation and reset to a neutral state.",
+  },
+  { command: "logout", description: "🚪 Log out of your session" },
 ];
 
 bot.use((ctx, next) => {
@@ -39,7 +56,9 @@ bot.use((ctx, next) => {
 bot.telegram.setMyCommands(menu_bar_commands);
 
 bot.start((ctx) => {
-    return ctx.reply("Welcome to the OKTO bot!. I am your AI assistant. How can I help you today?");
+    return ctx.reply(
+      "Hey there! I’m your crypto buddy. How can I make your day easier today?"
+    );
 })
 
 bot.command("login", (ctx) => {
@@ -135,7 +154,10 @@ bot.command("cancel", async (ctx) => {
         where: { userId }
     });
 
-    return ctx.reply("Flow canceled. Use /login to start again.");
+    return ctx.reply(
+      "✅ Your previous interaction has been successfully cancelled. You can now start fresh! 🚀"
+    );
+
 });
 
 async function logout(ctx: Context) {
@@ -247,11 +269,11 @@ bot.on("text", async (ctx) => {
             await login(ctx);
         }
         else if (ai_res.command === "logout") {
-            await logout(ctx);
-        }
-        else {
-            const command = ai_res.command
-            ctx.reply("/" + command);
+          await logout(ctx);
+        } else {
+          return ctx.reply(
+            "🤔 Oops! I couldn't quite understand that. Could you try again or check the available commands? 😊"
+          );
         }
     }
 
