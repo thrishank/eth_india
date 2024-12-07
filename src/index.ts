@@ -30,6 +30,12 @@ const menu_bar_commands = [
     { command: "cancel", description: "Cancel the current process" },
     { command: "logout", description: "Logout of the bot" },
 ];
+
+bot.use((ctx, next) => {
+    console.log(ctx.message);
+    next();
+})
+
 bot.telegram.setMyCommands(menu_bar_commands);
 
 bot.start((ctx) => {

@@ -31,6 +31,7 @@ export async function processUserInput(userInput: string): Promise<CommandRespon
   - Do NOT include any markdown code blocks (no \`\`\`)
   - Do NOT include any text before or after the JSON
   - Ensure the JSON is exactly in the format specified
+  - ⁠Always check if the intent is "login". If the user input contains words like "login" , prioritize that intent over other intents, even if other words like "wallet" are mentioned.
   Output the JSON object that matches the input intent.
   - If the intent is "login":
     Output: 
