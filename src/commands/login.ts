@@ -26,7 +26,7 @@ export async function login(ctx: Context) {
   }
 
   if (userAuth?.authToken) {
-    return ctx.reply("Hello I am your AI assistant. How can I help you today? Your'e already logged in with OKTO");
+    return ctx.reply("Hello I am your crypto buddy. How can I help you today? Your'e already logged in with OKTO");
   }
 
   // Update state for login flow
@@ -35,7 +35,7 @@ export async function login(ctx: Context) {
     context: { isAI: false, command: "login", sub_command: "email" },
   });
 
-  return ctx.reply("Please enter your email address to begin login:");
+  return ctx.reply("Please enter your email address to login:");
 }
 
 const OKTO_API_KEY = "50142dbc-b4d4-4577-a4db-7580ac14256c";
