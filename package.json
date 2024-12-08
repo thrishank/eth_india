@@ -17,10 +17,13 @@
     "typescript": "^5.7.2"
   },
   "dependencies": {
+    "@ethereum-attestation-service/eas-sdk": "^2.7.0",
     "@google/generative-ai": "^0.21.0",
     "@lifi/sdk": "^3.4.2",
     "@prisma/client": "^6.0.1",
+    "axios": "^1.7.9",
     "ethers": "^6.13.4",
+    "form-data": "^4.0.1",
     "prisma": "^6.0.1",
     "sqlite3": "^5.1.7",
     "telegraf": "^4.16.3",

@@ -13,8 +13,11 @@ import { fetchNameSuggestions } from "./lib/base";
 import { wallet } from "./commands/wallet";
 import { portfolio } from "./commands/portfolio";
 import { history } from "./commands/history";
+import path from "path";
+import * as fs from "fs";
+import { apiRequest, uploadFile } from "./akave";
 
-const bot_token = "7887692704:AAE9g8oEGMB-REyHu7ZITvzrVLOG10f11Mc"
+const bot_token = "7922798417:AAHMSm2Qkrt2JuE0w3dZeUG_NG9fyW9JxzM";
 const bot = new Telegraf(bot_token);
 
 const prisma = new PrismaClient();
@@ -47,6 +50,57 @@ const menu_bar_commands = [
     },
     { command: "logout", description: "🚪 Log out of your session" },
 ];
+
+const filePath = path.join(__dirname, 'chat_data.json');
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+
+if (!fs.existsSync(filePath)) {
+    fs.writeFileSync(filePath, '[]');
+}
+
+function getFileSize(file: string): number {
+    return fs.statSync(file).size;
+}
+
+async function onFileSizeExceeded(file: string) {
+    try {
+      console.log(`File size exceeded 5MB: ${file}`);
+  
+      // Create a bucket named 'chat_history'
+      const createBucketResponse = await apiRequest('POST', '/buckets', { bucketName: 'chat_history' });
+      console.log("Bucket Creation Response:", createBucketResponse);
+  
+      // Upload the file to the created bucket
+      await uploadFile('chat_history', file);
+      console.log("File uploaded to Akave successfully.");
+  
+      // Clear file contents after upload
+      fs.writeFileSync(file, '[]');
+      console.log("File content reset after upload.");
+    } catch (error) {
+      console.error("Error handling file size exceed:", error);
+    }
+  }
+
+function appendToFile(data: any) {
+    const existingData = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    existingData.push(data);
+    fs.writeFileSync(filePath, JSON.stringify(existingData, null, 2));
+
+    // if (getFileSize(filePath) > MAX_FILE_SIZE) {
+        console.log(getFileSize(filePath));
+        onFileSizeExceeded(filePath);
+    // }
+}
+
+bot.use(async (ctx, next) => {
+    const interaction = {
+        update: ctx.update,
+        timestamp: new Date().toISOString(),
+    };
+    await next();
+    appendToFile(interaction);
+});
 
 bot.use((ctx, next) => {
     console.log(ctx.message);
@@ -504,14 +558,14 @@ bot.on("text", async (ctx) => {
                     // @ts-ignore
                     const finalStatus = await pollOrderStatus(data.data.orderId, userAuth.authToken);
                     await resetUserState(userId);
-                    if(finalStatus === "SUCCESS"){
+                    if (finalStatus === "SUCCESS") {
                         return ctx.reply("Transfer successful!");
-                    } else if(finalStatus === "FAILED"){
+                    } else if (finalStatus === "FAILED") {
                         return ctx.reply("Transfer failed");
-                    } else{
+                    } else {
                         return ctx.reply("Transfer still in progress...");
                     }
-             
+
                 } else {
                     await resetUserState(userId);
                     return ctx.reply("Transfer failed. Please try again /transfer");
